@@ -3,672 +3,781 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Komunikacijski simulator — NRZ · CRC-32 · Hamming · BPSK</title>
+<title>Komunikacijski pipeline — NRZ · CRC-32 · Hamming · BPSK</title>
 <style>
-  :root {
-    --bg: #ffffff;
-    --bg2: #f5f5f3;
-    --bg3: #eeede9;
-    --text: #1a1a18;
-    --text2: #6b6b66;
-    --text3: #9c9a92;
-    --border: rgba(0,0,0,0.12);
-    --border2: rgba(0,0,0,0.22);
-    --blue-bg: #e6f1fb;
-    --blue-text: #0c447c;
-    --blue-border: #85b7eb;
-    --orange-bg: #faeeda;
-    --orange-text: #633806;
-    --orange-border: #ef9f27;
-    --green-bg: #eaf3de;
-    --green-text: #27500a;
-    --green-border: #97c459;
-    --warn-bg: #faeeda;
-    --warn-text: #633806;
-    --warn-border: #ba7517;
-    --radius: 8px;
-    --radius-lg: 12px;
-    --mono: 'Courier New', monospace;
-    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1c1c1a;
-      --bg2: #252523;
-      --bg3: #2e2e2b;
-      --text: #e8e6df;
-      --text2: #9c9a92;
-      --text3: #6b6b66;
-      --border: rgba(255,255,255,0.1);
-      --border2: rgba(255,255,255,0.2);
-      --blue-bg: #042c53;
-      --blue-text: #b5d4f4;
-      --blue-border: #185fa5;
-      --orange-bg: #412402;
-      --orange-text: #fac775;
-      --orange-border: #854f0b;
-      --green-bg: #173404;
-      --green-text: #c0dd97;
-      --green-border: #3b6d11;
-      --warn-bg: #412402;
-      --warn-text: #fac775;
-      --warn-border: #854f0b;
-    }
-  }
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: var(--sans);
-    background: var(--bg3);
-    color: var(--text);
-    min-height: 100vh;
-    padding: 2rem 1rem;
-  }
-  .page { max-width: 780px; margin: 0 auto; }
-  h1 { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
-  .subtitle { font-size: 14px; color: var(--text2); margin-bottom: 2rem; }
-  .tab-bar {
-    display: flex; gap: 4px; margin-bottom: 1.5rem;
-    background: var(--bg2); border-radius: var(--radius-lg);
-    padding: 4px; border: 0.5px solid var(--border);
-  }
-  .tab {
-    flex: 1; padding: 8px 12px; border-radius: var(--radius);
-    border: none; background: transparent; cursor: pointer;
-    font-size: 13px; font-weight: 500; color: var(--text2);
-    transition: all .15s;
-  }
-  .tab.active { background: var(--bg); color: var(--text); border: 0.5px solid var(--border); }
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500&display=swap');
 
-  /* --- SIMULATOR --- */
-  .section {
-    background: var(--bg); border: 0.5px solid var(--border);
-    border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-bottom: 1rem;
-  }
-  .sec-title {
-    font-size: 11px; font-weight: 500; color: var(--text2);
-    letter-spacing: .06em; text-transform: uppercase; margin-bottom: .75rem;
-  }
-  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: .75rem; }
-  label { font-size: 13px; color: var(--text2); min-width: 80px; }
-  input[type=text] {
-    flex: 1; min-width: 180px; font-family: var(--mono); font-size: 13px;
-    background: var(--bg2); border: 0.5px solid var(--border2);
-    border-radius: var(--radius); padding: 7px 10px; color: var(--text);
-    outline: none;
-  }
-  input[type=text]:focus { border-color: #185fa5; }
-  input[type=range] {
-    flex: 1; accent-color: #185fa5; cursor: pointer;
-  }
-  button {
-    padding: 7px 14px; border-radius: var(--radius);
-    border: 0.5px solid var(--border2); background: transparent;
-    color: var(--text); font-size: 13px; cursor: pointer; transition: all .15s;
-  }
-  button:hover { background: var(--bg2); }
-  button:disabled { opacity: .35; cursor: default; }
-  .bit-display {
-    font-family: var(--mono); font-size: 12px; color: var(--text);
-    word-break: break-all; background: var(--bg2); border-radius: var(--radius);
-    padding: 8px 10px; line-height: 1.7;
-  }
-  .bit-display .b1 { color: #185fa5; font-weight: 500; }
-  .bit-display .b0 { color: var(--text3); }
-  .pipeline-arrow { text-align: center; color: var(--text3); font-size: 16px; margin: 6px 0; }
-  canvas { width: 100%; display: block; border-radius: var(--radius); background: var(--bg2); }
-  .metric { display: inline-flex; gap: 5px; align-items: baseline; margin-right: 14px; }
-  .metric-val { font-size: 15px; font-weight: 500; color: var(--text); font-family: var(--mono); }
-  .metric-lbl { font-size: 12px; color: var(--text2); }
-  .bpsk-wrap { display: flex; gap: 12px; flex-wrap: wrap; }
-  .bpsk-wrap > div { flex: 1; min-width: 200px; }
-  .bpsk-wrap canvas { height: 100px; }
-  .ber-badge {
-    font-size: 13px; font-weight: 500; padding: 3px 10px;
-    border-radius: var(--radius); font-family: var(--mono);
-    background: var(--blue-bg); color: var(--blue-text);
-  }
-  .hamming-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 6px; margin-top: 4px; }
-  .hblock {
-    background: var(--bg2); border-radius: var(--radius);
-    padding: 6px 8px; font-size: 11px; font-family: var(--mono);
-  }
-  .hblock .hl { font-size: 10px; color: var(--text2); font-family: var(--sans); margin-bottom: 2px; }
-  .parity-bit { color: #d85a30; font-weight: 500; }
-  .data-bit { color: #185fa5; }
-  .noise-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-  .nrz-canvas { height: 80px; }
-  .stats-wrap { flex-wrap: wrap; }
+:root {
+  --bg: #0a0a0f;
+  --bg2: #0f0f18;
+  --bg3: #13131e;
+  --bg4: #1a1a28;
+  --panel: #111120;
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.12);
+  --text: #e8e6f0;
+  --text2: #7a788a;
+  --text3: #4a4860;
+  --accent: #6c63ff;
+  --accent2: #9d96ff;
+  --blue: #3d8ef0;
+  --blue2: #6aadff;
+  --teal: #1db8a0;
+  --teal2: #4dd8c0;
+  --orange: #f0843d;
+  --orange2: #ffaa6a;
+  --pink: #e060c0;
+  --pink2: #ff88dd;
+  --green: #40c060;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', sans-serif;
+}
 
-  /* --- EXPLAINER --- */
-  .stepper { display: flex; gap: 4px; margin-bottom: 1.5rem; align-items: center; flex-wrap: wrap; }
-  .step-dot {
-    width: 30px; height: 30px; border-radius: 50%;
-    border: 0.5px solid var(--border2); display: flex;
-    align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 500; cursor: pointer;
-    transition: all .2s; color: var(--text2); flex-shrink: 0;
-  }
-  .step-dot.active { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
-  .step-dot.done { background: var(--green-bg); color: var(--green-text); border-color: var(--green-border); }
-  .step-line { flex: 1; height: 1px; background: var(--border); min-width: 6px; }
-  .card {
-    background: var(--bg); border: 0.5px solid var(--border);
-    border-radius: var(--radius-lg); padding: 1.25rem;
-  }
-  .card-title { font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
-  .card-sub { font-size: 13px; color: var(--text2); margin-bottom: 1rem; }
-  .analogy {
-    background: var(--warn-bg); border-radius: 0 var(--radius) var(--radius) 0;
-    padding: 10px 14px; font-size: 13px; color: var(--warn-text);
-    margin-bottom: 1rem; border-left: 2px solid var(--warn-border);
-    line-height: 1.6;
-  }
-  .visual {
-    background: var(--bg2); border-radius: var(--radius); padding: 10px 12px;
-    margin-bottom: 1rem; font-family: var(--mono); font-size: 12px;
-    line-height: 1.8; word-break: break-all; color: var(--text);
-  }
-  .vis-label { font-size: 11px; color: var(--text2); font-family: var(--sans); margin-bottom: 4px; }
-  .hl { color: #185fa5; font-weight: 500; }
-  .hl2 { color: #d85a30; font-weight: 500; }
-  .hl3 { color: #1d9e75; font-weight: 500; }
-  .bullet { margin-bottom: 6px; font-size: 13px; color: var(--text); padding-left: 16px; position: relative; line-height: 1.5; }
-  .bullet::before { content: '—'; position: absolute; left: 0; color: var(--text3); }
-  .row-nav {
-    display: flex; gap: 8px; justify-content: space-between;
-    align-items: center; margin-top: 1.25rem;
-  }
-  .progress { font-size: 12px; color: var(--text2); }
-  .pill {
-    display: inline-block; padding: 2px 10px; border-radius: 20px;
-    font-size: 11px; font-weight: 500;
-  }
-  .pill-blue { background: var(--blue-bg); color: var(--blue-text); }
-  .pill-orange { background: var(--orange-bg); color: var(--orange-text); }
-  .pill-green { background: var(--green-bg); color: var(--green-text); }
-  .pill-gray { background: var(--bg2); color: var(--text2); border: 0.5px solid var(--border2); }
-  .stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1rem; }
-  .stat { background: var(--bg2); border-radius: var(--radius); padding: 8px 14px; flex: 1; min-width: 80px; }
-  .stat-l { font-size: 11px; color: var(--text2); margin-bottom: 2px; }
-  .big-num { font-size: 15px; font-weight: 500; color: var(--text); }
-  .exp-canvas { width: 100%; display: block; border-radius: var(--radius); background: var(--bg2); height: 70px; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  footer {
-    margin-top: 2rem; text-align: center; font-size: 12px; color: var(--text3);
-  }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* subtle grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(108,99,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(108,99,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+/* HEADER */
+header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;
+}
+.header-left h1 {
+  font-size: 13px; font-weight: 500; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text2); margin-bottom: 6px;
+  font-family: var(--mono);
+}
+.header-left h2 {
+  font-size: 22px; font-weight: 300; color: var(--text);
+  letter-spacing: -.02em;
+}
+.header-left h2 span { color: var(--accent2); font-weight: 500; }
+.input-row {
+  display: flex; gap: 8px; align-items: center;
+}
+.msg-input {
+  background: var(--bg4); border: 0.5px solid var(--border2);
+  border-radius: 8px; padding: 8px 14px; color: var(--text);
+  font-family: var(--mono); font-size: 13px; width: 280px; outline: none;
+  transition: border-color .2s;
+}
+.msg-input:focus { border-color: var(--accent); }
+.run-btn {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; padding: 8px 18px; font-size: 13px;
+  font-weight: 500; cursor: pointer; transition: all .15s;
+  font-family: var(--sans); white-space: nowrap;
+}
+.run-btn:hover { background: var(--accent2); transform: translateY(-1px); }
+
+/* PIPELINE FLOW */
+.pipeline-flow {
+  display: flex; align-items: center; gap: 0;
+  margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 4px;
+}
+.flow-node {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  flex-shrink: 0;
+}
+.flow-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  transition: all .3s;
+}
+.flow-label { font-size: 10px; font-family: var(--mono); color: var(--text3); letter-spacing: .08em; }
+.flow-arrow {
+  flex: 1; height: 1px; min-width: 30px; max-width: 80px;
+  background: linear-gradient(90deg, transparent, var(--border2), transparent);
+  margin-bottom: 14px; position: relative; overflow: visible;
+}
+.flow-arrow::after {
+  content: '';
+  position: absolute; right: -1px; top: -3px;
+  border: 3px solid transparent;
+  border-left: 5px solid var(--border2);
+}
+.flow-dot.c1 { background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+.flow-dot.c2 { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+.flow-dot.c3 { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+.flow-dot.c4 { background: var(--pink); box-shadow: 0 0 8px var(--pink); }
+.flow-dot.c5 { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+/* STATS BAR */
+.stats-bar {
+  display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap;
+}
+.stat-pill {
+  background: var(--panel); border: 0.5px solid var(--border);
+  border-radius: 6px; padding: 6px 14px;
+  display: flex; align-items: baseline; gap: 6px;
+}
+.stat-pill .sv { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+.stat-pill .sl { font-size: 11px; color: var(--text2); }
+.sv.blue { color: var(--blue2); }
+.sv.teal { color: var(--teal2); }
+.sv.orange { color: var(--orange2); }
+.sv.pink { color: var(--pink2); }
+.sv.green { color: var(--green); }
+
+/* GRID */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 12px;
+}
+@media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+/* PANEL */
+.panel {
+  background: var(--panel);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+.panel::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  opacity: .6;
+}
+.panel.p1::before { background: linear-gradient(90deg, transparent, var(--blue), transparent); }
+.panel.p2::before { background: linear-gradient(90deg, transparent, var(--teal), transparent); }
+.panel.p3::before { background: linear-gradient(90deg, transparent, var(--orange), transparent); }
+.panel.p4::before { background: linear-gradient(90deg, transparent, var(--pink), transparent); }
+
+.panel-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 1rem;
+}
+.panel-icon {
+  width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; font-family: var(--mono);
+  flex-shrink: 0;
+}
+.pi1 { background: rgba(61,142,240,0.15); color: var(--blue2); }
+.pi2 { background: rgba(29,184,160,0.15); color: var(--teal2); }
+.pi3 { background: rgba(240,132,61,0.15); color: var(--orange2); }
+.pi4 { background: rgba(224,96,192,0.15); color: var(--pink2); }
+
+.panel-title { font-size: 14px; font-weight: 500; color: var(--text); }
+.panel-sub { font-size: 11px; color: var(--text2); font-family: var(--mono); margin-top: 1px; }
+
+/* BIT DISPLAY */
+.bit-stream {
+  font-family: var(--mono); font-size: 11px; line-height: 1.9;
+  word-break: break-all; color: var(--text3);
+  max-height: 80px; overflow: hidden; position: relative;
+}
+.bit-stream::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px;
+  background: linear-gradient(transparent, var(--panel));
+}
+.bit-stream .b1 { color: var(--blue2); }
+.bit-stream .b0 { color: var(--text3); }
+.bit-stream .bp { color: var(--orange2); }
+.bit-stream .bc { color: var(--teal2); }
+
+/* CANVAS */
+canvas {
+  width: 100%; display: block; border-radius: 6px;
+}
+.canvas-wrap {
+  position: relative; background: var(--bg2);
+  border-radius: 6px; padding: 2px;
+  border: 0.5px solid var(--border);
+}
+.canvas-label {
+  position: absolute; top: 6px; right: 8px;
+  font-size: 10px; font-family: var(--mono);
+  color: var(--text3); letter-spacing: .06em;
+  pointer-events: none;
+}
+
+/* CRC panel extras */
+.crc-hex {
+  font-family: var(--mono); font-size: 20px; font-weight: 500;
+  color: var(--teal2); letter-spacing: .08em; margin-bottom: 6px;
+}
+.crc-meta { font-size: 11px; color: var(--text2); margin-bottom: 10px; }
+
+/* Hamming blocks */
+.hamming-scroll {
+  display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
+  scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+}
+.hblock {
+  flex-shrink: 0; background: var(--bg4);
+  border: 0.5px solid var(--border);
+  border-radius: 6px; padding: 6px 8px;
+  min-width: 72px;
+}
+.hblock-label {
+  font-size: 9px; color: var(--text3); font-family: var(--mono);
+  letter-spacing: .06em; margin-bottom: 4px;
+}
+.hblock-bits {
+  font-family: var(--mono); font-size: 13px; letter-spacing: .1em;
+}
+.hb-p { color: var(--orange2); }
+.hb-d { color: var(--blue2); }
+
+/* BPSK dual canvas */
+.bpsk-grid {
+  display: grid; grid-template-columns: 2fr 1fr; gap: 8px;
+}
+.bpsk-grid .canvas-wrap canvas { height: 100px; }
+
+/* SNR control */
+.snr-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+}
+.snr-row label { font-size: 11px; color: var(--text2); font-family: var(--mono); white-space: nowrap; }
+.snr-row input[type=range] {
+  flex: 1; accent-color: var(--pink); cursor: pointer; height: 3px;
+}
+.snr-val { font-family: var(--mono); font-size: 12px; color: var(--pink2); min-width: 36px; }
+.ber-val { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+
+/* FOOTER */
+footer {
+  margin-top: 2rem; display: flex; justify-content: space-between;
+  align-items: center; flex-wrap: wrap; gap: 8px;
+}
+footer span { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+.live-dot {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-family: var(--mono); color: var(--green);
+}
+.live-dot::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 6px var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* animated bit travel */
+.bit-travel {
+  position: absolute; font-family: var(--mono); font-size: 10px;
+  pointer-events: none; transition: opacity .3s;
+}
 </style>
 </head>
 <body>
 <div class="page">
-  <h1>Komunikacijski simulator</h1>
-  <p class="subtitle">NRZ · CRC-32 · Hamming (7,4) · BPSK — Kolokvij 1, Fizična plast</p>
 
-  <div class="tab-bar">
-    <button class="tab active" onclick="switchTab('simulator')">Simulator</button>
-    <button class="tab" onclick="switchTab('explainer')">Razlaga (za ne-tehničarje)</button>
+  <header>
+    <div class="header-left">
+      <h1>Fizična plast komunikacije &mdash; Kolokvij 1</h1>
+      <h2>Komunikacijski <span>pipeline</span></h2>
+    </div>
+    <div class="input-row">
+      <input class="msg-input" id="msgInput" type="text" value="Aleš Novak E300400500 Slovenija" placeholder="Vpiši sporočilo...">
+      <button class="run-btn" onclick="simulate()">Simuliraj</button>
+    </div>
+  </header>
+
+  <!-- pipeline flow diagram -->
+  <div class="pipeline-flow">
+    <div class="flow-node">
+      <div class="flow-dot c1"></div>
+      <div class="flow-label">ASCII</div>
+    </div>
+    <div class="flow-arrow"></div>
+    <div class="flow-node">
+      <div class="flow-dot c2"></div>
+      <div class="flow-label">CRC-32</div>
+    </div>
+    <div class="flow-arrow"></div>
+    <div class="flow-node">
+      <div class="flow-dot c3"></div>
+      <div class="flow-label">HAMMING</div>
+    </div>
+    <div class="flow-arrow"></div>
+    <div class="flow-node">
+      <div class="flow-dot c4"></div>
+      <div class="flow-label">NRZ</div>
+    </div>
+    <div class="flow-arrow"></div>
+    <div class="flow-node">
+      <div class="flow-dot c5"></div>
+      <div class="flow-label">BPSK</div>
+    </div>
+    <div class="flow-arrow"></div>
+    <div class="flow-node">
+      <div class="flow-dot" style="background:var(--text3)"></div>
+      <div class="flow-label">ŽICA</div>
+    </div>
   </div>
 
-  <!-- ===== SIMULATOR ===== -->
-  <div id="tab-simulator" class="tab-panel active">
+  <!-- stats bar -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-pill"><span class="sv blue" id="s0">—</span><span class="sl">znakov</span></div>
+    <div class="stat-pill"><span class="sv blue" id="s1">—</span><span class="sl">bit surovo</span></div>
+    <div class="stat-pill"><span class="sv teal" id="s2">—</span><span class="sl">bit + CRC-32</span></div>
+    <div class="stat-pill"><span class="sv orange" id="s3">—</span><span class="sl">bit + Hamming</span></div>
+    <div class="stat-pill"><span class="sv pink" id="s4">—</span><span class="sl">SNR</span></div>
+    <div class="stat-pill"><span class="sv green" id="s5">—</span><span class="sl">BER</span></div>
+  </div>
 
-    <div class="section">
-      <div class="sec-title">Vhodni podatki</div>
-      <div class="row">
-        <label>Sporočilo</label>
-        <input type="text" id="msgInput" value="Aleš Novak E300400500 Slovenija">
-        <button onclick="simulate()">Simuliraj</button>
-      </div>
-      <div id="rawBits" class="bit-display"></div>
-    </div>
+  <!-- 4-panel grid -->
+  <div class="grid">
 
-    <div class="pipeline-arrow">↓ CRC-32 zaščitno kodiranje</div>
-
-    <div class="section">
-      <div class="sec-title">CRC-32 — zaščitno kodiranje</div>
-      <div id="crcInfo" class="bit-display"></div>
-    </div>
-
-    <div class="pipeline-arrow">↓ Hamming (7,4) kanalsko kodiranje</div>
-
-    <div class="section">
-      <div class="sec-title">Hamming (7,4) — kanalsko kodiranje (prvih 8 blokov)</div>
-      <div id="hammingGrid" class="hamming-grid"></div>
-      <div id="hammingStats" style="margin-top:8px;font-size:12px;color:var(--text2)"></div>
-    </div>
-
-    <div class="pipeline-arrow">↓ NRZ nivojska predstavitev → BPSK modulacija</div>
-
-    <div class="section">
-      <div class="sec-title">NRZ signal (prvih 64 bitov)</div>
-      <canvas id="nrzCanvas" class="nrz-canvas"></canvas>
-    </div>
-
-    <div class="section">
-      <div class="sec-title">BPSK modulacija (prvih 32 bitov)</div>
-      <div class="bpsk-wrap">
+    <!-- PANEL 1: ASCII + CRC -->
+    <div class="panel p1">
+      <div class="panel-header">
+        <div class="panel-icon pi1">01</div>
         <div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Moduliran signal</div>
-          <canvas id="bpskCanvas"></canvas>
-        </div>
-        <div>
-          <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Konstelacija</div>
-          <canvas id="constCanvas"></canvas>
+          <div class="panel-title">ASCII kodiranje</div>
+          <div class="panel-sub">besedilo → biti</div>
         </div>
       </div>
-      <div class="noise-row">
-        <label style="min-width:60px;font-size:12px;color:var(--text2)">SNR (dB)</label>
+      <div id="rawBits" class="bit-stream"></div>
+    </div>
+
+    <!-- PANEL 2: CRC-32 -->
+    <div class="panel p2">
+      <div class="panel-header">
+        <div class="panel-icon pi2">CRC</div>
+        <div>
+          <div class="panel-title">CRC-32 zaščita</div>
+          <div class="panel-sub">32-bitna kontrolna vsota</div>
+        </div>
+      </div>
+      <div class="crc-hex" id="crcHex">—</div>
+      <div class="crc-meta" id="crcMeta"></div>
+      <div id="crcBits" class="bit-stream"></div>
+    </div>
+
+    <!-- PANEL 3: Hamming -->
+    <div class="panel p3">
+      <div class="panel-header">
+        <div class="panel-icon pi3">7,4</div>
+        <div>
+          <div class="panel-title">Hamming (7,4)</div>
+          <div class="panel-sub">kanalsko kodiranje</div>
+        </div>
+      </div>
+      <div class="hamming-scroll" id="hammingBlocks"></div>
+      <div style="margin-top:8px;font-size:10px;color:var(--text3);font-family:var(--mono)">
+        <span style="color:var(--orange2)">■</span> pariteta &nbsp;
+        <span style="color:var(--blue2)">■</span> podatki
+      </div>
+    </div>
+
+    <!-- PANEL 4: NRZ signal -->
+    <div class="panel p1" style="border-top-color:transparent">
+      <div class="panel::before" style="background:linear-gradient(90deg,transparent,var(--blue),transparent)"></div>
+      <div class="panel-header">
+        <div class="panel-icon pi1">NRZ</div>
+        <div>
+          <div class="panel-title">NRZ signal</div>
+          <div class="panel-sub">nivojska predstavitev</div>
+        </div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="nrzCanvas" height="90"></canvas>
+        <span class="canvas-label">64 bitov</span>
+      </div>
+    </div>
+
+    <!-- PANEL 5+6: BPSK (full width) -->
+    <div class="panel p4" style="grid-column: 1 / -1;">
+      <div class="panel-header">
+        <div class="panel-icon pi4">BPSK</div>
+        <div>
+          <div class="panel-title">BPSK modulacija</div>
+          <div class="panel-sub">Binary Phase Shift Keying</div>
+        </div>
+      </div>
+      <div class="bpsk-grid">
+        <div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:6px">MODULIRAN SIGNAL — faza 0° = bit 1 &nbsp;|&nbsp; faza 180° = bit 0</div>
+          <div class="canvas-wrap">
+            <canvas id="bpskCanvas" height="110"></canvas>
+            <span class="canvas-label">32 bitov</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:6px">KONSTELACIJA IQ</div>
+          <div class="canvas-wrap">
+            <canvas id="constCanvas" height="110"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="snr-row">
+        <label>SNR</label>
         <input type="range" min="0" max="20" value="10" id="snrSlider" step="1" oninput="updateSNR(this.value)">
-        <span id="snrVal" style="font-family:var(--mono);font-size:13px;min-width:40px">10 dB</span>
-        <span id="berBadge" class="ber-badge">BER: —</span>
+        <span class="snr-val" id="snrVal">10 dB</span>
+        <span class="ber-val">BER: <span id="berVal">—</span></span>
       </div>
     </div>
 
-    <div class="section">
-      <div class="sec-title">Statistika paketa</div>
-      <div id="stats" class="stats-wrap row"></div>
-    </div>
   </div>
 
-  <!-- ===== EXPLAINER ===== -->
-  <div id="tab-explainer" class="tab-panel">
-    <div class="stepper" id="exp-dots"></div>
-    <div id="exp-content"></div>
-  </div>
-
-  <footer>Kolokvij 1 · Lotrič Meroslovje · 2025/26</footer>
+  <footer>
+    <span>jakob-cmyk &mdash; Kolokvij 1 &mdash; Fizična plast</span>
+    <span class="live-dot">live simulation</span>
+    <span id="ts" style="font-size:10px;color:var(--text3)"></span>
+  </footer>
 </div>
 
 <script>
-// ========== TAB SWITCHING ==========
-function switchTab(id) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-'+id).classList.add('active');
-  event.target.classList.add('active');
-}
-
-// ========== SIMULATOR ==========
+// ── helpers ──────────────────────────────────────────────────────
 function strToBits(str) {
-  let bits = [];
+  let b = [];
   for (let i = 0; i < str.length; i++) {
-    let b = str.charCodeAt(i).toString(2).padStart(8,'0');
-    for (let c of b) bits.push(parseInt(c));
+    const c = str.charCodeAt(i).toString(2).padStart(8,'0');
+    for (let ch of c) b.push(+ch);
   }
-  return bits;
+  return b;
 }
 
-function crc32(bits) {
+function crc32calc(bits) {
   let bytes = [];
   for (let i = 0; i < bits.length; i += 8) {
-    let byte = 0;
-    for (let j = 0; j < 8; j++) byte = (byte << 1) | (bits[i+j] || 0);
-    bytes.push(byte);
+    let by = 0;
+    for (let j = 0; j < 8; j++) by = (by << 1) | (bits[i+j]||0);
+    bytes.push(by);
   }
   let crc = 0xFFFFFFFF;
   const poly = 0xEDB88320;
-  for (let byte of bytes) {
-    crc ^= byte;
-    for (let k = 0; k < 8; k++) crc = (crc & 1) ? (crc >>> 1) ^ poly : crc >>> 1;
+  for (let by of bytes) {
+    crc ^= by;
+    for (let k = 0; k < 8; k++) crc = (crc&1) ? (crc>>>1)^poly : crc>>>1;
   }
-  crc = (crc ^ 0xFFFFFFFF) >>> 0;
-  let crcBits = [];
-  for (let i = 31; i >= 0; i--) crcBits.push((crc >> i) & 1);
-  return { crc, crcBits };
+  crc = (crc^0xFFFFFFFF)>>>0;
+  let cb = [];
+  for (let i = 31; i >= 0; i--) cb.push((crc>>i)&1);
+  return { crc, cb };
 }
 
-function hammingEncode74(nibble) {
+function hammingEncode(nibble) {
   const [d1,d2,d3,d4] = nibble;
-  const p1 = d1^d2^d4;
-  const p2 = d1^d3^d4;
-  const p3 = d2^d3^d4;
-  return [p1,p2,d1,p3,d2,d3,d4];
-}
-
-function drawNRZ(canvas, bits) {
-  const W = canvas.offsetWidth || 700; const H = 80;
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
-  const n = Math.min(bits.length, 64);
-  const bw = W / n;
-  ctx.strokeStyle = 'rgba(128,128,128,0.15)'; ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
-  ctx.strokeStyle = '#185fa5'; ctx.lineWidth = 2;
-  ctx.beginPath();
-  let x = 0;
-  for (let i = 0; i < n; i++) {
-    const y = bits[i] === 1 ? H*0.2 : H*0.8;
-    if (i === 0) ctx.moveTo(x, y);
-    else {
-      const py = bits[i-1] === 1 ? H*0.2 : H*0.8;
-      if (py !== y) { ctx.lineTo(x, py); ctx.lineTo(x, y); }
-    }
-    ctx.lineTo(x + bw, y);
-    x += bw;
-  }
-  ctx.stroke();
-}
-
-function drawBPSK(canvas, bits) {
-  const W = canvas.offsetWidth || 300; const H = 100;
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
-  const n = Math.min(bits.length, 32);
-  const fc = 4, samp = 20;
-  const total = n * samp;
-  ctx.strokeStyle = '#d85a30'; ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  for (let s = 0; s < total; s++) {
-    const bi = Math.floor(s / samp);
-    const phase = bits[bi] === 1 ? 0 : Math.PI;
-    const t = s / samp;
-    const y = H/2 - (H*0.38) * Math.cos(2*Math.PI*fc*t/samp + phase);
-    if (s === 0) ctx.moveTo(0, y); else ctx.lineTo(s*(W/total), y);
-  }
-  ctx.stroke();
-}
-
-function drawConstellation(canvas, bits, snrLin) {
-  const W = canvas.offsetWidth || 200; const H = 100;
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
-  ctx.strokeStyle = 'rgba(128,128,128,0.2)'; ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
-  const noise = snrLin ? 1/Math.sqrt(2*snrLin) : 0.3;
-  for (let i = 0; i < Math.min(bits.length, 64); i++) {
-    const ix = bits[i] === 1 ? 1 : -1;
-    const nx = ix + (Math.random()-0.5)*noise*2;
-    const ny = (Math.random()-0.5)*noise*2;
-    ctx.beginPath();
-    ctx.arc(W/2 + nx*(W*0.32), H/2 + ny*(H*0.6), 2.5, 0, 2*Math.PI);
-    ctx.fillStyle = bits[i] === 1 ? '#185fa5' : '#d85a30';
-    ctx.fill();
-  }
-  ctx.fillStyle = '#185fa5'; ctx.font = '11px monospace'; ctx.fillText('1', W*0.72, H/2-5);
-  ctx.fillStyle = '#d85a30'; ctx.fillText('0', W*0.1, H/2-5);
+  return [d1^d2^d4, d1^d3^d4, d1, d2^d3^d4, d2, d3, d4];
 }
 
 function erfc(x) {
   const t = 1/(1+0.3275911*Math.abs(x));
   const y = 1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);
-  return x >= 0 ? 1-y : 1+y;
+  return x>=0?1-y:1+y;
 }
-function bpskBER(snrDB) {
-  const snrLin = Math.pow(10, snrDB/10);
-  return 0.5 * erfc(Math.sqrt(2*snrLin) / Math.sqrt(2));
+function calcBER(snrdB) {
+  const snr = Math.pow(10, snrdB/10);
+  return 0.5*erfc(Math.sqrt(2*snr)/Math.sqrt(2));
 }
 
+// ── drawing ──────────────────────────────────────────────────────
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth;
+  const H = canvas.height; // css px
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx, W, H };
+}
+
+function drawNRZ(canvas, bits) {
+  const {ctx,W,H} = setupCanvas(canvas);
+  ctx.clearRect(0,0,W,H);
+
+  // grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 0.5;
+  for (let y of [H*0.25, H*0.5, H*0.75]) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+  // labels
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.font = `9px 'JetBrains Mono'`;
+  ctx.fillText('+V', 4, H*0.22+4);
+  ctx.fillText('0V', 4, H*0.5+4);
+  ctx.fillText('−V', 4, H*0.78+4);
+
+  const n = Math.min(bits.length, 64);
+  const bw = (W-40) / n;
+  const x0 = 30;
+
+  // fill under signal
+  ctx.save();
+  const grad = ctx.createLinearGradient(0, H*0.15, 0, H*0.85);
+  grad.addColorStop(0, 'rgba(61,142,240,0.15)');
+  grad.addColorStop(1, 'rgba(61,142,240,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  let x = x0;
+  for (let i = 0; i < n; i++) {
+    const y = bits[i]===1 ? H*0.18 : H*0.82;
+    if (i===0) ctx.moveTo(x, H*0.5);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x+bw, y);
+  }
+  ctx.lineTo(x, H*0.5);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // signal line
+  ctx.strokeStyle = '#3d8ef0'; ctx.lineWidth = 2;
+  ctx.shadowColor = '#3d8ef0'; ctx.shadowBlur = 6;
+  ctx.beginPath();
+  x = x0;
+  for (let i = 0; i < n; i++) {
+    const y = bits[i]===1 ? H*0.18 : H*0.82;
+    if (i===0) { ctx.moveTo(x, y); }
+    else {
+      const py = bits[i-1]===1 ? H*0.18 : H*0.82;
+      if (py!==y) { ctx.lineTo(x, py); ctx.lineTo(x, y); }
+    }
+    ctx.lineTo(x+bw, y);
+    x += bw;
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // bit labels (first 32)
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = `8px 'JetBrains Mono'`;
+  x = x0;
+  for (let i = 0; i < Math.min(n, 32); i++) {
+    const y = bits[i]===1 ? H*0.18-6 : H*0.82+10;
+    ctx.fillStyle = bits[i]===1 ? 'rgba(106,173,255,0.5)' : 'rgba(255,255,255,0.15)';
+    ctx.fillText(bits[i], x+bw/2-3, y);
+    x += bw;
+  }
+}
+
+function drawBPSK(canvas, bits) {
+  const {ctx,W,H} = setupCanvas(canvas);
+  ctx.clearRect(0,0,W,H);
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+
+  const n = Math.min(bits.length, 32);
+  const samp = 24;
+  const total = n * samp;
+  const xScale = W / total;
+
+  // fill
+  ctx.save();
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(224,96,192,0.12)');
+  grad.addColorStop(1,'rgba(224,96,192,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(0, H/2);
+  for (let s = 0; s < total; s++) {
+    const bi = Math.floor(s/samp);
+    const phase = bits[bi]===1 ? 0 : Math.PI;
+    const t = s/samp;
+    const y = H/2 - (H*0.38)*Math.cos(2*Math.PI*4*t/samp+phase);
+    ctx.lineTo(s*xScale, y);
+  }
+  ctx.lineTo(W, H/2); ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // signal
+  ctx.strokeStyle = '#e060c0'; ctx.lineWidth = 1.8;
+  ctx.shadowColor = '#e060c0'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  for (let s = 0; s < total; s++) {
+    const bi = Math.floor(s/samp);
+    const phase = bits[bi]===1 ? 0 : Math.PI;
+    const t = s/samp;
+    const y = H/2 - (H*0.38)*Math.cos(2*Math.PI*4*t/samp+phase);
+    s===0 ? ctx.moveTo(0,y) : ctx.lineTo(s*xScale, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // phase change markers
+  ctx.strokeStyle = 'rgba(255,136,221,0.25)'; ctx.lineWidth = 0.5; ctx.setLineDash([3,3]);
+  for (let i = 1; i < n; i++) {
+    if (bits[i] !== bits[i-1]) {
+      const x = i*samp*xScale;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+  }
+  ctx.setLineDash([]);
+
+  // bit labels
+  for (let i = 0; i < n; i++) {
+    const x = i*samp*xScale + samp*xScale/2 - 3;
+    ctx.fillStyle = bits[i]===1 ? 'rgba(255,136,221,0.6)' : 'rgba(255,255,255,0.2)';
+    ctx.font = `9px 'JetBrains Mono'`;
+    ctx.fillText(bits[i], x, 12);
+  }
+}
+
+function drawConstellation(canvas, bits, snrLin) {
+  const {ctx,W,H} = setupCanvas(canvas);
+  ctx.clearRect(0,0,W,H);
+
+  // axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+
+  // axis labels
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = `9px 'JetBrains Mono'`;
+  ctx.fillText('I', W-14, H/2-4);
+  ctx.fillText('Q', W/2+4, 10);
+
+  const noise = snrLin ? 1/Math.sqrt(2*snrLin) : 0.3;
+  const n = Math.min(bits.length, 200);
+
+  for (let i = 0; i < n; i++) {
+    const ix = bits[i%bits.length]===1 ? 1 : -1;
+    const nx = ix + (Math.random()-.5)*noise*2.5;
+    const ny = (Math.random()-.5)*noise*2.5;
+    const px = W/2 + nx*(W*0.3);
+    const py = H/2 + ny*(H*0.5);
+
+    ctx.beginPath();
+    ctx.arc(px, py, 2, 0, 2*Math.PI);
+    if (bits[i%bits.length]===1) {
+      ctx.fillStyle = 'rgba(106,173,255,0.7)';
+    } else {
+      ctx.fillStyle = 'rgba(255,136,221,0.7)';
+    }
+    ctx.fill();
+  }
+
+  // ideal points
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
+  for (const ix of [1,-1]) {
+    ctx.beginPath();
+    ctx.arc(W/2+ix*(W*0.3), H/2, 5, 0, 2*Math.PI);
+    ctx.stroke();
+  }
+
+  // labels
+  ctx.fillStyle = 'rgba(106,173,255,0.9)'; ctx.font = `bold 10px 'JetBrains Mono'`;
+  ctx.fillText('1', W/2+W*0.3+6, H/2+4);
+  ctx.fillStyle = 'rgba(255,136,221,0.9)';
+  ctx.fillText('0', W/2-W*0.3-14, H/2+4);
+}
+
+// ── main simulate ────────────────────────────────────────────────
 let allHammingBits = [];
 
 function simulate() {
   const msg = document.getElementById('msgInput').value || 'Aleš Novak E300400500 Slovenija';
   const rawBits = strToBits(msg);
 
-  const bitHtml = rawBits.map(b => `<span class="${b?'b1':'b0'}">${b}</span>`).join('');
-  document.getElementById('rawBits').innerHTML =
-    `<span style="font-size:11px;color:var(--text2);font-family:var(--sans)">ASCII binarno (${rawBits.length} bitov):</span><br>${bitHtml}`;
+  // stats
+  document.getElementById('s0').textContent = msg.length;
+  document.getElementById('s1').textContent = rawBits.length;
 
-  const {crc, crcBits} = crc32(rawBits);
-  const crcHex = crc.toString(16).toUpperCase().padStart(8,'0');
-  const protBits = [...rawBits, ...crcBits];
-  const crcHtml = crcBits.map(b => `<span class="${b?'b1':'b0'}">${b}</span>`).join('');
-  document.getElementById('crcInfo').innerHTML =
-    `<span style="font-size:11px;color:var(--text2);font-family:var(--sans)">CRC-32 vrednost: 0x${crcHex} | popotnica (32 bitov):</span><br>${crcHtml}<br>
-     <span style="font-size:11px;color:var(--text2);font-family:var(--sans)">Skupaj z zaščito: ${protBits.length} bitov</span>`;
+  // ASCII bits display
+  const rawHtml = rawBits.map(b =>
+    `<span class="${b?'b1':'b0'}">${b}</span>`
+  ).join('');
+  document.getElementById('rawBits').innerHTML = rawHtml;
 
+  // CRC-32
+  const {crc, cb} = crc32calc(rawBits);
+  const hex = '0x' + crc.toString(16).toUpperCase().padStart(8,'0');
+  document.getElementById('crcHex').textContent = hex;
+  document.getElementById('crcMeta').textContent =
+    `${rawBits.length} + 32 = ${rawBits.length+32} bitov zaščitenih`;
+  document.getElementById('s2').textContent = rawBits.length + 32;
+
+  const protBits = [...rawBits, ...cb];
+  const crcHtml = rawBits.map(b =>
+    `<span class="b${b}">${b}</span>`
+  ).join('') + cb.map(b => `<span class="bc">${b}</span>`).join('');
+  document.getElementById('crcBits').innerHTML = crcHtml;
+
+  // Hamming
   allHammingBits = [];
-  const hammingGrid = document.getElementById('hammingGrid');
-  hammingGrid.innerHTML = '';
   const nibbles = [];
   for (let i = 0; i < protBits.length; i += 4) {
-    const nib = protBits.slice(i, i+4);
-    while (nib.length < 4) nib.push(0);
-    nibbles.push(nib);
+    const n = protBits.slice(i,i+4);
+    while(n.length<4) n.push(0);
+    nibbles.push(n);
   }
+  const hammingContainer = document.getElementById('hammingBlocks');
+  hammingContainer.innerHTML = '';
   nibbles.forEach((nib, idx) => {
-    const enc = hammingEncode74(nib);
+    const enc = hammingEncode(nib);
     allHammingBits.push(...enc);
-    if (idx < 8) {
+    if (idx < 24) {
       const el = document.createElement('div');
       el.className = 'hblock';
-      el.innerHTML = `<div class="hl">blok ${idx+1}</div>` +
-        enc.map((b,i) => `<span class="${[0,1,3].includes(i)?'parity-bit':'data-bit'}">${b}</span>`).join('');
-      hammingGrid.appendChild(el);
+      el.innerHTML = `<div class="hblock-label">B${idx+1}</div>` +
+        `<div class="hblock-bits">` +
+        enc.map((b,i) =>
+          `<span class="${[0,1,3].includes(i)?'hb-p':'hb-d'}">${b}</span>`
+        ).join('') + `</div>`;
+      hammingContainer.appendChild(el);
     }
   });
-  document.getElementById('hammingStats').innerHTML =
-    `<span style="color:#d85a30">■</span> pariteta &nbsp;<span style="color:#185fa5">■</span> podatki &nbsp;|&nbsp; ${nibbles.length} blokov × 7 bitov = ${allHammingBits.length} bitov skupaj`;
+  document.getElementById('s3').textContent = allHammingBits.length;
 
+  // draw signals
   setTimeout(() => {
     drawNRZ(document.getElementById('nrzCanvas'), allHammingBits);
     drawBPSK(document.getElementById('bpskCanvas'), allHammingBits);
     const snr = parseInt(document.getElementById('snrSlider').value);
-    drawConstellation(document.getElementById('constCanvas'), allHammingBits, Math.pow(10,snr/10));
+    const snrLin = Math.pow(10, snr/10);
+    drawConstellation(document.getElementById('constCanvas'), allHammingBits, snrLin);
     updateSNR(snr, false);
-  }, 50);
+  }, 30);
 
-  document.getElementById('stats').innerHTML =
-    `<span class="metric"><span class="metric-val">${msg.length}</span><span class="metric-lbl">znakov</span></span>` +
-    `<span class="metric"><span class="metric-val">${rawBits.length}</span><span class="metric-lbl">bit (surovo)</span></span>` +
-    `<span class="metric"><span class="metric-val">${protBits.length}</span><span class="metric-lbl">bit + CRC32</span></span>` +
-    `<span class="metric"><span class="metric-val">${allHammingBits.length}</span><span class="metric-lbl">bit + Hamming</span></span>` +
-    `<span class="metric"><span class="metric-val">${(allHammingBits.length/rawBits.length).toFixed(2)}×</span><span class="metric-lbl">overhead</span></span>`;
+  // timestamp
+  document.getElementById('ts').textContent = new Date().toLocaleTimeString('sl-SI');
 }
 
 function updateSNR(val, redraw=true) {
   document.getElementById('snrVal').textContent = val + ' dB';
-  const ber = bpskBER(parseFloat(val));
-  const berStr = ber < 1e-10 ? '< 10⁻¹⁰' : ber.toExponential(2);
-  document.getElementById('berBadge').textContent = 'BER: ' + berStr;
+  document.getElementById('s4').textContent = val + ' dB';
+  const ber = calcBER(parseFloat(val));
+  const berStr = ber < 1e-12 ? '< 10⁻¹²' : ber.toExponential(2);
+  document.getElementById('berVal').textContent = berStr;
+  document.getElementById('s5').textContent = berStr;
   if (redraw && allHammingBits.length > 0) {
     const snrLin = Math.pow(10, parseFloat(val)/10);
     drawConstellation(document.getElementById('constCanvas'), allHammingBits, snrLin);
   }
 }
 
-// ========== EXPLAINER ==========
-const steps = [
-  {
-    num:1, label:'Ideja', pill:'pill-gray',
-    title:'Kaj sploh počnemo?',
-    sub:'Osnovna ideja komunikacije',
-    html: `
-      <div class="analogy">Predstavljaj si, da hočeš prijatelju po žici poslati pismo. Ampak žica ne razume besed — razume samo elektriko: visoka napetost ali nizka napetost. Torej moraš pismo nekako spremeniti v ničle in enice, in jih po žici "poklikati" ven.</div>
-      <div style="font-size:14px;font-weight:500;margin-bottom:8px">Naš cilj</div>
-      <div class="bullet">Vzamemo besedilo: <span class="hl">"Aleš Novak E300400500 Slovenija"</span></div>
-      <div class="bullet">Ga zavarujemo pred napakami</div>
-      <div class="bullet">Pošljemo po žici kot električni signal</div>
-      <div class="bullet">Prejemnik ga rekonstruira nazaj v besedilo</div>
-      <div class="visual" style="margin-top:1rem">
-        <div class="vis-label">celotna pot sporočila</div>
-        Besedilo → <span class="hl">[CRC-32]</span> → <span class="hl2">[Hamming]</span> → <span class="hl3">[NRZ+BPSK]</span> → žica → sprejemnik
-      </div>`
-  },
-  {
-    num:2, label:'CRC-32', pill:'pill-blue',
-    title:'CRC-32 — kontrolna vsota',
-    sub:'Zaščita pred okvarjenimi podatki',
-    html: `
-      <div class="analogy">Zamisli si, da sestaviš puzzle in na koncu preštešeš kose: "imam 1000 kosov." To število napišeš na škatlo. Ko prijatelj odpre škatlo, prešteje kose — če dobi 997, ve, da so 3 kosi izgubljeni med potjo. CRC-32 dela točno to, samo z biti namesto puzzle kosov.</div>
-      <div style="font-size:14px;font-weight:500;margin-bottom:8px">Kako deluje</div>
-      <div class="bullet">Vzamemo vse bite sporočila</div>
-      <div class="bullet">Jih matematično "premešamo" po posebnem receptu (polinom)</div>
-      <div class="bullet">Dobimo 32-bitni "prstni odtis" sporočila</div>
-      <div class="bullet">Ta prstni odtis priložimo sporočilu</div>
-      <div class="bullet">Prejemnik naredi isti izračun — če se ne ujema, je prišlo do napake</div>
-      <div class="visual" style="margin-top:1rem">
-        <div class="vis-label">primer</div>
-        Sporočilo: <span class="hl">01000001</span> ("A")<br>
-        + CRC-32: <span class="hl2">4 bajte (32 bitov) prstnega odtisa</span><br>
-        Skupaj: <span class="hl3">8 + 32 = 40 bitov</span>
-      </div>
-      <div class="stat-row" style="margin-top:8px">
-        <div class="stat"><div class="stat-l">zazna</div><div class="big-num">vse 1–2 bitne napake</div></div>
-        <div class="stat"><div class="stat-l">overhead</div><div class="big-num">+32 bitov</div></div>
-        <div class="stat"><div class="stat-l">popravlja?</div><div class="big-num">Ne — samo zazna</div></div>
-      </div>`
-  },
-  {
-    num:3, label:'Hamming', pill:'pill-orange',
-    title:'Hamming (7,4) — kanalsko kodiranje',
-    sub:'Avtomatsko popravljanje napak',
-    html: `
-      <div class="analogy">CRC-32 ti <em>pove</em>, da je prišlo do napake — ampak je ne zna popraviti. Hamming je pametnejši: vsake 4 bite podatkov zaščiti s 3 dodatnimi "nadzornimi" biti, postavljeni tako da ti natančno povedo <em>kateri</em> bit se je pokvaril — in ga avtomatsko popravijo.</div>
-      <div style="font-size:14px;font-weight:500;margin-bottom:8px">Kako izgleda</div>
-      <div class="visual">
-        <div class="vis-label">nibble "1011" → Hamming (7,4) blok</div>
-        pozicija:  <span class="hl">1  2</span>  3  <span class="hl">4</span>  5  6  7<br>
-        pomen:     <span class="hl">P1 P2</span> D1 <span class="hl">P3</span> D2 D3 D4<br>
-        vrednosti: <span class="hl2">1  0</span>  1  <span class="hl2">0</span>  0  1  1<br>
-        <br>
-        <span style="font-size:11px;color:var(--text2)">P = pariteta (zaščitni bit), D = podatek</span>
-      </div>
-      <div class="bullet">Iz 4 bitov podatkov dobimo 7 bitov</div>
-      <div class="bullet">3 "nadzorni" biti preverjajo različne kombinacije podatkovnih bitov</div>
-      <div class="bullet">Če se en bit pokvari, nadzorni biti skupaj pokažejo točno kateri</div>
-      <div class="bullet">Napaka se <em>avtomatsko</em> popravi — brez ponovnega pošiljanja</div>
-      <div class="stat-row" style="margin-top:8px">
-        <div class="stat"><div class="stat-l">vhod</div><div class="big-num">4 bite</div></div>
-        <div class="stat"><div class="stat-l">izhod</div><div class="big-num">7 bitov</div></div>
-        <div class="stat"><div class="stat-l">popravlja</div><div class="big-num">1 bitno napako</div></div>
-      </div>`
-  },
-  {
-    num:4, label:'NRZ', pill:'pill-gray',
-    title:'NRZ — nivojska predstavitev',
-    sub:'Binarni podatki kot električni signal',
-    html: `
-      <div class="analogy">Imaš bit "1" in bit "0". Po žici moraš z elektriko. Najpreprostejša rešitev: bit 1 = visoka napetost (+5V), bit 0 = nizka napetost (0V). To je NRZ. Signal gre gor za enico, dol za ničlo, in tam ostane dokler se bit ne zamenja.</div>
-      <canvas id="expNrz" class="exp-canvas"></canvas>
-      <div class="visual" style="margin-top:8px">
-        <div class="vis-label">zaporedje 1 0 1 1 0 0 1 0</div>
-        <span class="hl">1</span>=visoko &nbsp;<span class="hl2">0</span>=nizko &nbsp;signal ostane na isti ravni med enakim bitom
-      </div>
-      <div class="bullet">Preprosto in direktno</div>
-      <div class="bullet">Problem: dolgo zaporedje ničel/enic → signal miruje → izguba sinhronizacije</div>
-      <div class="bullet">Za prenos po žici zadostuje za kratke razdalje</div>`,
-    afterRender: () => {
-      const c = document.getElementById('expNrz');
-      if (!c) return;
-      const bits = [1,0,1,1,0,0,1,0,1,1,0,1,0,0,1,0];
-      const W = c.offsetWidth||700; const H = 70;
-      c.width=W; c.height=H;
-      const ctx=c.getContext('2d');
-      const bw=W/bits.length;
-      ctx.strokeStyle='#185fa5'; ctx.lineWidth=2.5;
-      ctx.beginPath();
-      bits.forEach((b,i)=>{
-        const y=b===1?H*0.18:H*0.82;
-        if(i===0) ctx.moveTo(0,y);
-        else {
-          const py=bits[i-1]===1?H*0.18:H*0.82;
-          if(py!==y){ctx.lineTo(i*bw,py);ctx.lineTo(i*bw,y);}
-        }
-        ctx.lineTo((i+1)*bw,y);
-      });
-      ctx.stroke();
-      bits.forEach((b,i)=>{
-        ctx.fillStyle=b?'#185fa5':'#d85a30';
-        ctx.font='11px monospace';
-        ctx.fillText(b, i*bw+bw/2-3, b===1?H*0.18-5:H*0.82+13);
-      });
+// resize redraw
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (allHammingBits.length > 0) {
+      drawNRZ(document.getElementById('nrzCanvas'), allHammingBits);
+      drawBPSK(document.getElementById('bpskCanvas'), allHammingBits);
+      const snr = parseInt(document.getElementById('snrSlider').value);
+      drawConstellation(document.getElementById('constCanvas'), allHammingBits, Math.pow(10,snr/10));
     }
-  },
-  {
-    num:5, label:'BPSK', pill:'pill-blue',
-    title:'BPSK — modulacija',
-    sub:'Signal na radio/žično frekvenco',
-    html: `
-      <div class="analogy">NRZ signal je OK za kratke razdalje, ampak na daljše razdalje moramo signal "zapakirati" v neko frekvenco. BPSK je kot da pošiljaš Morsovo abecedo z radijskim valom: za bit 1 pošlješ val v eni fazi, za bit 0 isti val obrnjen za 180°. Prejemnik posluša in prepozna razliko.</div>
-      <canvas id="expBpsk" class="exp-canvas"></canvas>
-      <div class="visual" style="margin-top:8px">
-        <div class="vis-label">faza signala</div>
-        bit <span class="hl">1</span> → val začne normalno (faza 0°)<br>
-        bit <span class="hl2">0</span> → val je obrnjen (faza 180°)
-      </div>
-      <div class="bullet">Sama frekvenca se ne spremeni — samo faza</div>
-      <div class="bullet">Prejemnik ima referenčni val in primerja (Costasov sprejemnik)</div>
-      <div class="bullet">BPSK = 1 bit na simbol, preprost in zanesljiv</div>`,
-    afterRender: () => {
-      const c = document.getElementById('expBpsk');
-      if (!c) return;
-      const bits=[1,1,0,1,0,0,1,0];
-      const W=c.offsetWidth||700; const H=70;
-      c.width=W; c.height=H;
-      const ctx=c.getContext('2d');
-      const samp=20, total=bits.length*samp;
-      ctx.strokeStyle='#d85a30'; ctx.lineWidth=1.5;
-      ctx.beginPath();
-      for(let s=0;s<total;s++){
-        const bi=Math.floor(s/samp);
-        const phase=bits[bi]===1?0:Math.PI;
-        const t=s/samp;
-        const y=H/2-(H*0.38)*Math.cos(2*Math.PI*3*t/samp+phase);
-        if(s===0)ctx.moveTo(0,y); else ctx.lineTo(s*(W/total),y);
-      }
-      ctx.stroke();
-      bits.forEach((b,i)=>{
-        ctx.fillStyle=b?'#185fa5':'#d85a30';
-        ctx.font='10px monospace';
-        ctx.fillText(b, i*(W/bits.length)+3, 12);
-      });
-    }
-  },
-  {
-    num:6, label:'Skupaj', pill:'pill-green',
-    title:'Celotna slika',
-    sub:'Kaj se zgodi z "Aleš Novak E300400500 Slovenija"',
-    html: `
-      <div class="visual"><div class="vis-label">korak 1 — ASCII kodiranje</div>"Aleš..." → <span class="hl">248 bitov</span> (31 znakov × 8 bitov)</div>
-      <div class="visual"><div class="vis-label">korak 2 — CRC-32</div>248 bitov + <span class="hl2">32-bitni prstni odtis</span> = <span class="hl">280 bitov</span></div>
-      <div class="visual"><div class="vis-label">korak 3 — Hamming (7,4)</div>280 bitov → 70 blokov × 7 bitov = <span class="hl2">490 bitov</span></div>
-      <div class="visual"><div class="vis-label">korak 4 — NRZ + BPSK</div>490 bitov → električni signal → <span class="hl3">po žici</span></div>
-      <div class="stat-row" style="margin-top:12px">
-        <div class="stat"><div class="stat-l">surovi podatki</div><div class="big-num">248 bit</div></div>
-        <div class="stat"><div class="stat-l">po zaščiti</div><div class="big-num">490 bit</div></div>
-        <div class="stat"><div class="stat-l">overhead</div><div class="big-num">~2×</div></div>
-      </div>
-      <div class="analogy" style="margin-top:4px">Za vsak bit sporočila pošljemo ~2 bita — polovica je "zavarovanje". To je cena zanesljive komunikacije.</div>`
-  }
-];
+  }, 100);
+});
 
-let curStep = 0;
-function renderStep(i) {
-  curStep = i;
-  const s = steps[i];
-  document.getElementById('exp-dots').innerHTML = steps.map((st,idx) =>
-    `<div class="step-dot ${idx===i?'active':idx<i?'done':''}" onclick="renderStep(${idx})">${idx<i?'✓':st.num}</div>` +
-    (idx<steps.length-1 ? '<div class="step-line"></div>' : '')
-  ).join('');
-
-  document.getElementById('exp-content').innerHTML = `
-    <div class="card">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <span class="pill ${s.pill}">${s.label}</span>
-        <span class="card-title">${s.title}</span>
-      </div>
-      <div class="card-sub">${s.sub}</div>
-      ${s.html}
-      <div class="row-nav">
-        <button onclick="renderStep(${Math.max(0,i-1)})" ${i===0?'disabled':''}>← Nazaj</button>
-        <span class="progress">${i+1} / ${steps.length}</span>
-        ${i<steps.length-1
-          ? `<button onclick="renderStep(${i+1})">Naprej →</button>`
-          : `<button onclick="document.querySelectorAll('.tab')[0].click();simulate()">Preizkusi simulator →</button>`
-        }
-      </div>
-    </div>`;
-  if (s.afterRender) setTimeout(s.afterRender, 60);
-}
-
-// Init
 simulate();
-renderStep(0);
 </script>
 </body>
 </html>
